@@ -13,4 +13,4 @@ Open `index.html` lokaal of via GitHub Pages. Druk `skip` om te testen.
 1. Maak een nieuwe repo (public).
 2. Upload `index.html` en `.nojekyll` naar de root.
 3. Settings → Pages → Source: Deploy from a branch, Branch: main (root). Save.
-4. Site: `https://<username>.github.io/<repo>/`.
+4. Site: `https://<username>.github.io/<repo>/`.\
