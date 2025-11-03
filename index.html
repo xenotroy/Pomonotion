@@ -341,8 +341,12 @@
 
     function clamp(v,min,max){ v=parseInt(v||0,10); return Math.max(min, Math.min(max, v)); }
     function setStatus(t){ els.status.textContent=t }
-    function setTimeDisplay(sec){ const m=Math.floor(sec/60).toString().padStart(2,'0'); const s=Math.floor(sec%60).toString().padStart(2,'0'); els.time.textContent=fm(m)+':'+fm(s); document.title=els.time.textContent+' • '+state.mode }
-    function fm(s){ return s }  # keep pad result intact without f-string
+function setTimeDisplay(sec){
+  const m = Math.floor(sec/60).toString().padStart(2,'0');
+  const s = Math.floor(sec%60).toString().padStart(2,'0');
+  els.time.textContent = `${m}:${s}`;
+  document.title = `${els.time.textContent} • ${state.mode}`;
+}
 
     function setMode(mode){
       state.mode=mode;
