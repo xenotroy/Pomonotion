@@ -40,6 +40,7 @@
     input:focus,select:focus,textarea:focus{outline:2px solid rgba(96,165,250,.5);border-color:#60a5fa}
     textarea{min-height:120px;resize:vertical}
     .small{font-size:12px;color:var(--muted)}
+    .field .small{display:block}
     table{width:100%;border-collapse:collapse}
     th,td{border-bottom:1px solid var(--stroke);padding:10px;text-align:left;vertical-align:top}
     th{color:#f1f5f9;font-weight:700;font-size:12px}
@@ -142,7 +143,7 @@
           <button id="downloadNotesCsv">download notes csv</button>
           <button id="downloadTasksCsv">download taken csv</button>
           <button id="copyNotesCsv">kopieer notes csv</button>
-          <button id="copyTasksCsv">kopieer taken csv</button>
+          <button id="copyTasksCsv">kopieer taken excel</button>
           <button id="copyAllMd">kopieer alle als markdown</button>
           <button id="clearLog" class="warn">wis log</button>
         </div>
@@ -165,7 +166,7 @@
           <tbody></tbody>
         </table>
       </div>
-      <div class="small" id="hint">download maakt .csv • kopie is fallback voor sandbox/preview</div>
+      <div class="small" id="hint">download maakt .csv • kopie taken = excel plakken</div>
     </div>
   </div>
 
@@ -191,11 +192,13 @@
         </div>
         <div class="field">
           <label for="noteSubject">onderwerp *</label>
-          <select id="noteSubject"></select>
+          <input id="noteSubject" list="subjectOptions" placeholder="bv. klantwerk" />
+          <datalist id="subjectOptions"></datalist>
         </div>
         <div class="field">
           <label for="noteCategory">categorie *</label>
-          <select id="noteCategory"></select>
+          <input id="noteCategory" list="categoryOptions" placeholder="bv. administratie" />
+          <datalist id="categoryOptions"></datalist>
         </div>
         <div class="field">
           <label for="noteStatus">status *</label>
@@ -208,15 +211,15 @@
         </div>
         <div class="field">
           <label for="noteStart">start</label>
-          <input id="noteStart" />
+          <input id="noteStart" type="datetime-local" step="60" />
         </div>
         <div class="field">
           <label for="noteEnd">einde</label>
-          <input id="noteEnd" />
+          <input id="noteEnd" type="datetime-local" step="60" />
         </div>
         <div class="field">
-          <label for="noteDuration">duur</label>
-          <input id="noteDuration" disabled />
+          <label for="noteDuration">duur (min)</label>
+          <input id="noteDuration" type="number" min="0" step="1" />
         </div>
       </div>
       <div class="field" style="margin-top:10px">
@@ -224,7 +227,7 @@
         <textarea id="noteText" placeholder="wat is af wat blijft open"></textarea>
       </div>
       <div class="panel" style="margin-top:12px">
-        <div class="row" style="align-items:flex-end;gap:12px">
+        <div class="row" style="align-items:flex-start;gap:12px">
           <div class="field" style="min-width:120px">
             <label for="makeTask">maak ook een taak</label>
             <select id="makeTask">
@@ -269,6 +272,7 @@
       logBody: q('#logTable tbody'), downloadNotesCsv: q('#downloadNotesCsv'), downloadTasksCsv: q('#downloadTasksCsv'), copyNotesCsv: q('#copyNotesCsv'), copyTasksCsv: q('#copyTasksCsv'), copyAllMd: q('#copyAllMd'), clearLog: q('#clearLog'), hint: q('#hint'),
       csvModal: q('#csvModal'), csvText: q('#csvText'), copyCsv: q('#copyCsv'), closeCsv: q('#closeCsv'),
       noteModal: q('#noteModal'), formError: q('#formError'), noteTitle: q('#noteTitle'), noteSubject: q('#noteSubject'), noteCategory: q('#noteCategory'), noteStatus: q('#noteStatus'),
+      subjectOptions: q('#subjectOptions'), categoryOptions: q('#categoryOptions'),
       noteStart: q('#noteStart'), noteEnd: q('#noteEnd'), noteDuration: q('#noteDuration'), noteText: q('#noteText'), makeTask: q('#makeTask'), taskPrio: q('#taskPrio'), taskDue: q('#taskDue'),
       cancelNote: q('#cancelNote'), saveNote: q('#saveNote')
     };
@@ -305,10 +309,13 @@
       on(els.focusMin,'change', onSettingChange); on(els.breakMin,'change', onSettingChange); on(els.autoStart,'change', onSettingChange); on(els.copyOnSave,'change', onSettingChange); on(els.soundToggle,'change', onSettingChange);
       on(els.addSubject,'click', addSubject); on(els.removeSelected,'click', removeSubjects); on(els.addCategory,'click', addCategory); on(els.removeCategories,'click', removeCategories);
       on(els.downloadNotesCsv,'click', ()=>downloadCSV('notes')); on(els.downloadTasksCsv,'click', ()=>downloadCSV('tasks'));
-      on(els.copyNotesCsv,'click', ()=>copyCSV('notes')); on(els.copyTasksCsv,'click', ()=>copyCSV('tasks')); on(els.copyAllMd,'click', ()=>copy(textAllMarkdown())); on(els.clearLog,'click', clearLog);
+      on(els.copyNotesCsv,'click', ()=>copyCSV('notes')); on(els.copyTasksCsv,'click', copyTasksForExcel); on(els.copyAllMd,'click', ()=>copy(textAllMarkdown())); on(els.clearLog,'click', clearLog);
       on(els.cancelNote,'click', hideNote); on(els.saveNote,'click', saveEntry);
       on(els.noteText,'keydown', e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); saveEntry(); }});
       on(els.noteSubject,'keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); saveEntry(); }});
+      on(els.noteCategory,'keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); saveEntry(); }});
+      on(els.noteStart,'change', syncDurationFromTimes); on(els.noteEnd,'change', syncDurationFromTimes);
+      on(els.noteDuration,'input', ()=>{ els.noteDuration.dataset.userEdited='true'; });
       on(els.copyCsv,'click', ()=>copy(els.csvText.value)); on(els.closeCsv,'click', ()=>els.csvModal.classList.remove('show'));
 
       els.focusMin.value = state.settings.focusMin; els.breakMin.value = state.settings.breakMin; els.autoStart.value = state.settings.autoStart; els.copyOnSave.value = state.settings.copyOnSave; els.soundToggle.value = state.settings.sound;
@@ -366,7 +373,8 @@
 
     function skipPhase(){
       if(state.mode==='focus'){
-        if(!state.running){ state.startAt=new Date(Date.now()-state.settings.focusMin*60*1000); state.endAt=new Date(); }
+        if(!state.startAt){ state.startAt=new Date(Date.now()-state.settings.focusMin*60*1000); }
+        state.endAt = new Date();
         clearTick(); onPhaseEnd();
       }else{ clearTick(); nextMode('focus'); if(state.settings.autoStart==='focus') start(); }
     }
@@ -386,17 +394,24 @@
 
     function showNote(){
       const start = state.startAt ? state.startAt : new Date(Date.now() - state.settings.focusMin*60*1000);
-      const end = new Date(); const durMin = diffMin(start,end);
-      els.noteStart.value = fmtLocal(start); els.noteEnd.value = fmtLocal(end); els.noteDuration.value = durMin + ' min';
+      const end = state.endAt ? state.endAt : new Date();
+      const durMin = diffMin(start,end);
+      els.noteStart.value = fmtLocalInput(start);
+      els.noteEnd.value = fmtLocalInput(end);
+      els.noteDuration.value = durMin;
+      els.noteDuration.dataset.userEdited='';
       buildDropdowns(); els.noteTitle.value=''; els.noteText.value=''; els.makeTask.value='no'; els.taskPrio.value=''; els.taskDue.value='';
       els.formError.textContent=''; els.noteModal.classList.add('show'); els.noteTitle.focus();
     }
     function hideNote(){ els.noteModal.classList.remove('show'); }
 
     function buildDropdowns(){
-      els.noteSubject.innerHTML=''; state.subjects.forEach(s=>{ const o=doc('option'); o.value=s; o.textContent=s; els.noteSubject.appendChild(o); });
-      els.noteCategory.innerHTML=''; state.categories.forEach(c=>{ const o=doc('option'); o.value=c; o.textContent=c; els.noteCategory.appendChild(o); });
-      const last=state.logs[state.logs.length-1]; if(last){ els.noteSubject.value=last.subject; els.noteCategory.value=last.category; els.noteStatus.value=last.status || 'Done'; }
+      fillDatalist(els.subjectOptions, state.subjects);
+      fillDatalist(els.categoryOptions, state.categories);
+      const last=state.logs[state.logs.length-1];
+      els.noteSubject.value = last ? last.subject : '';
+      els.noteCategory.value = last ? last.category : '';
+      els.noteStatus.value = last && last.status ? last.status : 'Done';
     }
 
     function saveEntry(){
@@ -409,11 +424,15 @@
       if(err.length){ els.formError.textContent = 'Vul in: ' + err.join(', '); return; }
 
       const start = parseLocal(els.noteStart.value); const end = parseLocal(els.noteEnd.value);
+      const manualDur = parseInt(els.noteDuration.value, 10);
+      const durationMin = Number.isFinite(manualDur) && manualDur>=0 ? manualDur : diffMin(start,end);
       const entry = {
-        date: fmtDMY(start), start: fmtLocal(start), end: fmtLocal(end), durationMin: diffMin(start,end),
+        date: fmtDMY(start), start: fmtLocalDisplay(start), end: fmtLocalDisplay(end), durationMin,
         title, subject, category, status, notes,
         makeTask: (els.makeTask.value==='yes'), prio: els.taskPrio.value || '', dueManual: els.taskDue.value ? dmyFromISO(els.taskDue.value) : '' , type:'focus'
       };
+      ensureInList(subject, state.subjects, 'subjects', renderSubjectList);
+      ensureInList(category, state.categories, 'categories', renderCategoryList);
       state.logs.push(entry); save('logs', state.logs); appendLogRow(entry);
 
       if(state.settings.copyOnSave!=='no'){
@@ -424,11 +443,11 @@
       hideNote(); state.cycle += 1; nextMode('break'); if(state.settings.autoStart==='break') start();
     }
 
-    function renderSubjectList(){ els.subjectSelect.innerHTML=''; state.subjects.forEach(s=>{ const o=doc('option'); o.value=s; o.textContent=s; els.subjectSelect.appendChild(o); }); }
-    function renderCategoryList(){ els.categorySelect.innerHTML=''; state.categories.forEach(c=>{ const o=doc('option'); o.value=c; o.textContent=c; els.categorySelect.appendChild(o); }); }
-    function addSubject(){ const v=(els.newSubject.value||'').trim(); if(!v) return; if(!state.subjects.includes(v)){ state.subjects.push(v); save('subjects',state.subjects); renderSubjectList(); } els.newSubject.value=''; }
+    function renderSubjectList(){ els.subjectSelect.innerHTML=''; state.subjects.forEach(s=>{ const o=doc('option'); o.value=s; o.textContent=s; els.subjectSelect.appendChild(o); }); fillDatalist(els.subjectOptions, state.subjects); }
+    function renderCategoryList(){ els.categorySelect.innerHTML=''; state.categories.forEach(c=>{ const o=doc('option'); o.value=c; o.textContent=c; els.categorySelect.appendChild(o); }); fillDatalist(els.categoryOptions, state.categories); }
+    function addSubject(){ const v=(els.newSubject.value||'').trim(); if(!v) return; ensureInList(v, state.subjects, 'subjects', renderSubjectList); els.newSubject.value=''; }
     function removeSubjects(){ const selected=Array.from(els.subjectSelect.selectedOptions).map(o=>o.value); if(!selected.length) return; state.subjects=state.subjects.filter(s=>!selected.includes(s)); save('subjects',state.subjects); renderSubjectList(); }
-    function addCategory(){ const v=(els.newCategory.value||'').trim(); if(!v) return; if(!state.categories.includes(v)){ state.categories.push(v); save('categories',state.categories); renderCategoryList(); } els.newCategory.value=''; }
+    function addCategory(){ const v=(els.newCategory.value||'').trim(); if(!v) return; ensureInList(v, state.categories, 'categories', renderCategoryList); els.newCategory.value=''; }
     function removeCategories(){ const selected=Array.from(els.categorySelect.selectedOptions).map(o=>o.value); if(!selected.length) return; state.categories=state.categories.filter(c=>!selected.includes(c)); save('categories',state.categories); renderCategoryList(); }
 
     function renderLog(){ els.logBody.innerHTML=''; state.logs.forEach(appendLogRow); }
@@ -450,6 +469,16 @@
       const rows = tasks.map(e=>[ e.title, e.category, e.subject, e.notes, e.status, e.prio, e.dueManual ].map(csvCell).join(','));
       return [head, ...rows].join('\r\n');
     }
+    function buildTasksTSV(items){
+      const tasks = items.filter(e=>e.makeTask);
+      const head = ['Task','Categorie','Onderwerp','Notitie','Status','Prio','Due handmatig'].join('\t');
+      if(!tasks.length) return head;
+      const rows = tasks.map(e=>[ e.title, e.category, e.subject, e.notes, e.status, e.prio, e.dueManual ].map(v=>{
+        const s = v==null ? '' : String(v);
+        return s.replace(/\r?\n|\r/g,' ');
+      }).join('\t'));
+      return [head, ...rows].join('\n');
+    }
     function downloadCSV(kind){
       try{
         const text = (kind==='tasks')? buildTasksCSV(state.logs) : buildNotesCSV(state.logs);
@@ -470,14 +499,18 @@
     function textMarkdown(items){ return items.map(e=>'- '+e.date+' '+e.start+'-'+e.end+' | '+e.title+' | '+e.subject+' | '+e.durationMin+'m | '+e.notes).join('\n'); }
     function csvCell(v){ const s=(v==null?'':String(v)); return '"'+s.replace(/"/g,'""')+'"'; }
 
-    function fmtLocal(d){ const pad=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()) }
-    function parseLocal(s){ const parts=String(s).split(' '); const dm=parts[0].split('-').map(n=>parseInt(n,10)); const tm=(parts[1]||'00:00').split(':').map(n=>parseInt(n,10)); return new Date(dm[0],dm[1]-1,dm[2],tm[0],tm[1]) }
+    function fmtLocalInput(d){ const pad=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes()); }
+    function fmtLocalDisplay(d){ const pad=n=>String(n).padStart(2,'0'); return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes()); }
+    function parseLocal(s){ if(!s) return new Date(); const parts=String(s).split('T'); const dm=parts[0].split('-').map(n=>parseInt(n,10)); const tm=(parts[1]||'00:00').split(':').map(n=>parseInt(n,10)); return new Date(dm[0],dm[1]-1,dm[2],tm[0],tm[1]); }
     function fmtDMY(d){ const dd=String(d.getDate()).padStart(2,'0'); const mm=String(d.getMonth()+1).padStart(2,'0'); const yy=d.getFullYear(); return dd+'/'+mm+'/'+yy }
     function dmyFromISO(iso){ if(!iso) return ''; const p=iso.split('-'); return p[2]+'/'+p[1]+'/'+p[0]; }
     function diffMin(a,b){ return Math.max(0, Math.round((b-a)/60000)); }
     function esc(s){ return (s||'').replace(/[&<>]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])); }
     function doc(t){ return document.createElement(t); }
-    function copy(text){ navigator.clipboard.writeText(text).then(()=>{ els.hint.textContent='gekopieerd'; setTimeout(()=>els.hint.textContent='download maakt .csv • kopie is fallback voor sandbox/preview', 1200); }).catch(()=>{ openCsvModal(text); }); }
+    function copy(text){ navigator.clipboard.writeText(text).then(()=>{ els.hint.textContent='gekopieerd'; setTimeout(()=>els.hint.textContent='download maakt .csv • kopie taken = excel plakken', 1200); }).catch(()=>{ openCsvModal(text); }); }
+    function ensureInList(value, list, key, rerender){ if(!value) return; if(!list.includes(value)){ list.push(value); save(key, list); rerender(); } }
+    function fillDatalist(target, items){ if(!target) return; target.innerHTML=''; items.forEach(v=>{ const o=doc('option'); o.value=v; target.appendChild(o); }); }
+    function syncDurationFromTimes(){ if(els.noteDuration.dataset.userEdited==='true') return; const start=parseLocal(els.noteStart.value); const end=parseLocal(els.noteEnd.value); els.noteDuration.value = diffMin(start,end); }
     function save(k,v){ localStorage.setItem('pomo_'+k, JSON.stringify(v)); }
     function load(k,d){ try{ return JSON.parse(localStorage.getItem('pomo_'+k)) ?? d }catch{ return d } }
 
