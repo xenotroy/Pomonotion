@@ -341,19 +341,19 @@
 
     function clamp(v,min,max){ v=parseInt(v||0,10); return Math.max(min, Math.min(max, v)); }
     function setStatus(t){ els.status.textContent=t }
-function setTimeDisplay(sec){
-  const m = Math.floor(sec/60).toString().padStart(2,'0');
-  const s = Math.floor(sec%60).toString().padStart(2,'0');
-  els.time.textContent = `${m}:${s}`;
-  document.title = `${els.time.textContent} • ${state.mode}`;
-}
+    function setTimeDisplay(sec){
+      const m = Math.floor(sec/60).toString().padStart(2,'0');
+      const s = Math.floor(sec%60).toString().padStart(2,'0');
+      els.time.textContent = m + ":" + s;
+      document.title = els.time.textContent + " • " + state.mode;
+    }
 
     function setMode(mode){
       state.mode=mode;
       els.modePill.textContent=mode;
       els.modePill.className = 'pill ' + mode;
       els.hint.textContent=mode==='focus'?'log toont alleen focusblokken':'pauze loopt. geen logging';
-      els.cycleInfo.textContent='cyclus '+state.cycle;
+      els.cycleInfo.textContent='cyclus ' + state.cycle;
     }
 
     function start(){
@@ -432,7 +432,11 @@ function setTimeDisplay(sec){
     function removeCategories(){ const selected=Array.from(els.categorySelect.selectedOptions).map(o=>o.value); if(!selected.length) return; state.categories=state.categories.filter(c=>!selected.includes(c)); save('categories',state.categories); renderCategoryList(); }
 
     function renderLog(){ els.logBody.innerHTML=''; state.logs.forEach(appendLogRow); }
-    function appendLogRow(e){ const tr=doc('tr'); tr.innerHTML=('<td>'+esc(e.date)+'</td><td>'+esc(e.title)+'</td><td>'+esc(e.subject)+'</td><td>'+esc(e.category)+'</td><td>'+esc(e.status)+'</td><td>'+esc(e.start)+'</td><td>'+esc(e.end)+'</td><td>'+e.durationMin+'</td><td>'+(e.makeTask?'ja':'')+'</td>'); els.logBody.appendChild(tr); }
+    function appendLogRow(e){
+      const tr=doc('tr');
+      tr.innerHTML='<td>'+esc(e.date)+'</td><td>'+esc(e.title)+'</td><td>'+esc(e.subject)+'</td><td>'+esc(e.category)+'</td><td>'+esc(e.status)+'</td><td>'+esc(e.start)+'</td><td>'+esc(e.end)+'</td><td>'+e.durationMin+'</td><td>'+(e.makeTask?'ja':'')+'</td>';
+      els.logBody.appendChild(tr);
+    }
     function clearLog(){ if(!confirm('log wissen')) return; state.logs=[]; save('logs',state.logs); renderLog(); }
 
     function buildNotesCSV(items){
