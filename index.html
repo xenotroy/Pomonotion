@@ -479,7 +479,6 @@
       }).join('\t'));
       return [head, ...rows].join('\n');
     }
-    function copyTasksForExcel(){ copy(buildTasksTSV(state.logs)); }
     function downloadCSV(kind){
       try{
         const text = (kind==='tasks')? buildTasksCSV(state.logs) : buildNotesCSV(state.logs);
